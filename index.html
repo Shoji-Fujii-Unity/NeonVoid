@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>NEON VOID: Pocket FPS</title>
+<style>
+:root{
+  --bg:#020610;
+  --fg:#e9fbff;
+  --cyan:#00ffff;
+  --pink:#ff2d6f;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  margin:0;width:100%;height:100%;height:100dvh;overflow:hidden;
+  background:var(--bg);color:var(--fg);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  touch-action:none;
+}
+canvas{position:fixed;inset:0;z-index:0;display:block;touch-action:none}
+#ui{position:fixed;inset:0;z-index:10;pointer-events:none}
+.hidden{display:none !important}
+
+#hud{
+  position:absolute;left:10px;top:10px;z-index:22;pointer-events:none;
+  text-shadow:0 0 12px #00ffff,0 0 4px #000;font-weight:800;font-size:clamp(11px,2.2vmin,15px);
+}
+#hud .row{margin:3px 0}
+#hud .label{color:#7df;margin-right:5px}
+#hpWrap{width:min(220px,32vw);height:14px;border:1px solid var(--cyan);background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin-top:6px}
+#hpFill{height:100%;width:100%;background:linear-gradient(90deg,var(--pink),var(--cyan));box-shadow:0 0 18px var(--cyan)}
+#stageBanner{
+  position:absolute;left:50%;top:12%;transform:translateX(-50%);z-index:23;pointer-events:none;
+  font-weight:900;letter-spacing:.12em;color:#fff;text-shadow:0 0 18px var(--pink),0 0 6px var(--cyan);
+  opacity:0;transition:opacity .45s ease;font-size:clamp(18px,4.2vmin,34px);white-space:nowrap;
+}
+#stageBanner.show{opacity:1}
+
+#crosshair{position:absolute;left:50%;top:50%;width:26px;height:26px;transform:translate(-50%,-50%);z-index:21;pointer-events:none}
+#crosshair::before,#crosshair::after{content:"";position:absolute;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+#crosshair::before{left:12px;top:0;width:2px;height:26px}
+#crosshair::after{left:0;top:12px;width:26px;height:2px}
+
+#topRight{position:absolute;right:10px;top:10px;z-index:25;pointer-events:auto;display:flex;gap:8px}
+
+button{
+  font:inherit;color:var(--fg);background:rgba(8,32,50,.82);border:1px solid rgba(0,255,255,.55);
+  border-radius:10px;padding:9px 13px;cursor:pointer;backdrop-filter:blur(6px)
+}
+button:active{transform:scale(.97)}
+button.active{background:rgba(0,255,255,.18);border-color:#8fffff}
+.smallBtn{padding:8px 12px;font-size:13px}
+.bigBtn{padding:14px 22px;font-size:clamp(15px,3.2vmin,19px);font-weight:900;border-color:var(--cyan);box-shadow:0 0 24px rgba(0,255,255,.28)}
+
+#touchControls{position:absolute;inset:0;pointer-events:none;display:none}
+#touchLeft{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));width:128px;height:128px;border-radius:50%;border:2px solid rgba(0,255,255,.34);background:rgba(0,255,255,.07);pointer-events:auto;touch-action:none}
+#stickKnob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:rgba(0,255,255,.45);border:1px solid rgba(0,255,255,.85);box-shadow:0 0 18px rgba(0,255,255,.55);transform:translate(0,0)}
+#touchRight{position:absolute;left:45%;right:0;top:0;bottom:0;pointer-events:auto;touch-action:none}
+#fireBtn{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));width:108px;height:108px;border-radius:50%;background:rgba(255,45,111,.18);border:3px solid var(--pink);color:#fff;font-weight:900;pointer-events:auto;z-index:30;touch-action:none;box-shadow:0 0 22px rgba(255,45,111,.35)}
+
+.screen{
+  position:fixed;inset:0;z-index:100;pointer-events:auto;
+  background:rgba(2,6,16,.88);
+  display:flex;align-items:center;justify-content:center;
+  padding:clamp(6px,1.5vmin,18px);
+  overflow:auto;-webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  overscroll-behavior:contain;
+}
+.menuShell{width:min(1060px,97vw);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:clamp(6px,1.2vmin,12px)}
+h1{
+  margin:0;letter-spacing:.08em;color:#fff;
+  text-shadow:0 0 24px var(--cyan),0 0 6px var(--pink);
+  font-size:clamp(24px,6.5vmin,46px);text-align:center
+}
+h2{margin:0;color:var(--pink);text-shadow:0 0 18px var(--pink);font-size:clamp(20px,4.5vmin,34px)}
+.tag{color:#9ff;font-size:clamp(9px,1.8vmin,13px);margin-bottom:2px;text-align:center}
+.menuGrid{
+  display:grid;grid-template-columns:1fr;gap:clamp(8px,1.4vmin,14px);
+  width:100%;max-width:980px
+}
+.menuCol{display:flex;flex-direction:column;align-items:center;gap:clamp(6px,1.2vmin,10px);min-width:0}
+.settings{width:100%;max-width:430px;border:1px solid rgba(0,255,255,.25);background:rgba(0,0,0,.28);padding:10px;border-radius:14px}
+.settingTitle{color:#7df;font-size:clamp(10px,1.9vmin,13px);font-weight:900;margin:6px 0 5px;text-align:center}
+.langRow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.langBtn{padding:7px 9px;font-size:11px}
+.stageList{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:5px;width:100%}
+.stageBtn{padding:6px 7px;font-size:10px;border-radius:8px}
+.stageBtn.current{background:rgba(0,255,255,.16);border-color:#8fffff}
+.stageBtn:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.small{color:#7df;font-size:clamp(9px,1.7vmin,12px);text-align:center}
+.highVal{font-size:clamp(14px,2.8vmin,20px);font-weight:900;color:#fff;text-shadow:0 0 10px var(--pink)}
+.controlsBox{width:100%;max-width:560px;border:1px solid rgba(0,255,255,.22);background:rgba(0,0,0,.24);border-radius:14px;padding:10px;text-align:left;font-size:clamp(9px,1.7vmin,13px);line-height:1.55}
+.controlTitle{color:#7df;font-weight:900;margin-bottom:5px}
+.finalScore{font-size:clamp(18px,4vmin,26px);font-weight:900;color:#fff;text-shadow:0 0 16px var(--pink)}
+
+@media (orientation:landscape){
+  .menuGrid{grid-template-columns:1.05fr .95fr;align-items:start}
+  .menuCol{align-items:stretch}
+  .menuCol.left{align-items:center}
+  .settings,.controlsBox{max-width:none}
+}
+@media (max-height:430px) and (orientation:landscape){
+  .screen{padding:6px}
+  .menuShell{gap:6px}
+  .settings,.controlsBox{padding:7px}
+  .settingTitle{margin:3px 0 4px}
+  .controlsBox{line-height:1.35;font-size:10px}
+  #stageListWrap{max-height:30vh;overflow:auto;touch-action:pan-y}
+}
+
+#rotate{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;background:#020610;color:#7df;text-align:center;padding:24px;pointer-events:auto}
+#rotate h2{color:#fff}
+@media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="hud" class="hidden">
+    <div class="row"><span class="label" data-i18n="scoreLabel"></span><span id="scoreVal">0</span></div>
+    <div class="row"><span class="label" data-i18n="waveLabel"></span><span id="waveVal">1</span></div>
+    <div class="row"><span class="label" data-i18n="stageLabel"></span><span id="stageVal">0/8</span></div>
+    <div class="row"><span class="label" data-i18n="timeLabel"></span><span id="timeVal">0:00</span></div>
+    <div class="row"><span class="label" data-i18n="hpLabel"></span><span id="hpText">100</span></div>
+    <div id="hpWrap"><div id="hpFill"></div></div>
+  </div>
+  <div id="stageBanner" class="hidden"></div>
+
+  <div id="crosshair" class="hidden"></div>
+
+  <div id="topRight" class="hidden">
+    <button id="pauseBtn" class="smallBtn" data-i18n="pause"></button>
+  </div>
+
+  <div id="touchControls" style="display:none">
+    <div id="touchLeft"><div id="stickKnob"></div></div>
+    <div id="touchRight"></div>
+    <button id="fireBtn"><span data-i18n="fire"></span></button>
+  </div>
+
+  <div id="startScreen" class="screen">
+    <div class="menuShell">
+      <div class="menuGrid">
+        <div class="menuCol left">
+          <h1>NEON VOID</h1>
+          <div class="tag" data-i18n="tagline"></div>
+          <button id="startBtn" class="bigBtn" data-i18n="start"></button>
+          <div class="small" data-i18n="high"></div>
+          <div class="highVal">0</div>
+        </div>
+
+        <div class="menuCol right">
+          <div class="settings">
+            <div class="settingTitle" data-i18n="language"></div>
+            <div class="langRow">
+              <button class="langBtn" data-lang="ja">日本語</button>
+              <button class="langBtn" data-lang="en">English</button>
+              <button class="langBtn" data-lang="zh">中文</button>
+              <button class="langBtn" data-lang="es">Español</button>
+            </div>
+            <div class="settingTitle" data-i18n="sound"></div>
+            <div class="row"><button class="soundToggle">Sound: ON</button></div>
+          </div>
+
+          <div class="settings" id="stageListWrap">
+            <div class="settingTitle" data-i18n="stageSelect"></div>
+            <div class="stageList" id="stageList"></div>
+          </div>
+
+          <div class="controlsBox">
+            <div class="controlTitle" data-i18n="controlsTitle"></div>
+            <div data-i18n="controlsText"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pauseScreen" class="screen hidden">
+    <div class="menuShell">
+      <h2 data-i18n="pause"></h2>
+      <div class="settings" style="max-width:420px">
+        <div class="settingTitle" data-i18n="language"></div>
+        <div class="langRow">
+          <button class="langBtn" data-lang="ja">日本語</button>
+          <button class="langBtn" data-lang="en">English</button>
+          <button class="langBtn" data-lang="zh">中文</button>
+          <button class="langBtn" data-lang="es">Español</button>
+        </div>
+        <div class="settingTitle" data-i18n="sound"></div>
+        <div class="row"><button class="soundToggle">Sound: ON</button></div>
+      </div>
+      <div class="row">
+        <button id="resumeBtn" class="bigBtn" data-i18n="resume"></button>
+        <button id="quitBtn" data-i18n="quit"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overScreen" class="screen hidden">
+    <div class="menuShell">
+      <h2 data-i18n="gameover"></h2>
+      <div class="finalScore" id="finalScore">SCORE: 0</div>
+      <div class="small"><span data-i18n="stageReached"></span>: <span id="finalStage"></span> / <span data-i18n="waveReached"></span>: <span id="finalWave"></span></div>
+      <button id="retryBtn" class="bigBtn" data-i18n="retry"></button>
+      <button id="backBtn" data-i18n="quit"></button>
+    </div>
+  </div>
+
+  <div id="loadError" class="screen hidden"><h2 data-i18n="noThree"></h2></div>
+
+  <div id="rotate">
+    <div><h2 data-i18n="rotateTitle"></h2><p data-i18n="rotateText"></p></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+const I18N = {
+  ja:{tagline:"横長 / サウンド / 多言語 / ローカル保存 / 8ステージ / モンスター",scoreLabel:"SCORE",hpLabel:"HP",waveLabel:"WAVE",timeLabel:"TIME",stageLabel:"STAGE",high:"ハイスコア",start:"ゲーム開始",pause:"一時停止",resume:"再開",quit:"やめる",gameover:"GAME OVER",retry:"リトライ",language:"言語",sound:"サウンド",soundOn:"ON",soundOff:"OFF",fire:"射撃",stageSelect:"ステージ選択",stageReached:"到達STAGE",waveReached:"到達WAVE",controlsTitle:"操作",controlsText:"PC: WASD移動 / マウス視点 + 左クリック射撃 / ESC一時停止<br>スマホ: 左スティック移動 / 右タッチ視点 / FIRE射撃",rotateTitle:"横画面でプレイ",rotateText:"スマートフォンは横にしてからプレイしてください。",noThree:"Three.js の読み込みに失敗しました。"},
+  en:{tagline:"Landscape / Sound / Multilingual / Local save / 8 stages / Monsters",scoreLabel:"SCORE",hpLabel:"HP",waveLabel:"WAVE",timeLabel:"TIME",stageLabel:"STAGE",high:"HIGH SCORE",start:"START GAME",pause:"PAUSE",resume:"RESUME",quit:"QUIT",gameover:"GAME OVER",retry:"RETRY",language:"Language",sound:"Sound",soundOn:"ON",soundOff:"OFF",fire:"FIRE",stageSelect:"SELECT STAGE",stageReached:"STAGE",waveReached:"WAVE",controlsTitle:"Controls",controlsText:"PC: WASD move / Mouse look + Left click shoot / ESC pause<br>Mobile: Left stick move / Right touch look / FIRE shoot",rotateTitle:"PLAY LANDSCAPE",rotateText:"Please rotate your phone to landscape.",noThree:"Failed to load Three.js."},
+  zh:{tagline:"横屏 / 音效 / 多语言 / 本地保存 / 8个关卡 / 怪物",scoreLabel:"得分",hpLabel:"生命",waveLabel:"波次",timeLabel:"时间",stageLabel:"关卡",high:"最高分",start:"开始游戏",pause:"暂停",resume:"继续",quit:"退出",gameover:"游戏结束",retry:"重试",language:"语言",sound:"音效",soundOn:"开",soundOff:"关",fire:"射击",stageSelect:"选择关卡",stageReached:"到达关卡",waveReached:"到达波次",controlsTitle:"操作",controlsText:"PC：WASD移动 / 鼠标视角 + 左键射击 / ESC暂停<br>手机：左摇杆移动 / 右侧触摸视角 / FIRE射击",rotateTitle:"请横屏游玩",rotateText:"请将手机横过来。",noThree:"无法加载 Three.js。"},
+  es:{tagline:"Horizontal / Sonido / Multilenguaje / Guardado / 8 niveles / Monstruos",scoreLabel:"PUNTOS",hpLabel:"VIDA",waveLabel:"OLEADA",timeLabel:"TIEMPO",stageLabel:"NIVEL",high:"RÉCORD",start:"INICIAR",pause:"PAUSA",resume:"SEGUIR",quit:"SALIR",gameover:"GAME OVER",retry:"REINTENTAR",language:"Idioma",sound:"Sonido",soundOn:"ON",soundOff:"OFF",fire:"DISPARAR",stageSelect:"ELEGIR NIVEL",stageReached:"NIVEL",waveReached:"OLEADA",controlsTitle:"Controles",controlsText:"PC: WASD moverse / Ratón + clic izq. / ESC pausa<br>Móvil: Stick izq. / Tocar derecha mirar / FIRE disparar",rotateTitle:"JUEGA EN HORIZONTAL",rotateText:"Gira tu teléfono en horizontal.",noThree:"No se pudo cargar Three.js."}
+};
+
+const SAVE_KEY="neonvoid_save_v2";
+const ARENA_HALF=16;
+const MAX_ALIVE=26;
+const STAGE_DURATION=70;
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function $(s){return document.querySelector(s)}
+function $$(s){return document.querySelectorAll(s)}
+function show(s){const e=$(s);if(e)e.classList.remove("hidden")}
+function hide(s){const e=$(s);if(e)e.classList.add("hidden")}
+function setClass(s,c,a){const e=$(s);if(e)e.classList.toggle(c,!!a)}
+function getSaved(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||"{}")}catch(e){return{}}}
+const navLang=(navigator.language||"ja").slice(0,2).toLowerCase();
+const defaultLang=["ja","en","zh","es"].includes(navLang)?navLang:"ja";
+
+let saved=getSaved();
+let save={lang:defaultLang,sound:true,highscore:0,totalKills:0};
+save=Object.assign(save,saved);
+if(!I18N[save.lang])save.lang=defaultLang;
+save.sound=!!save.sound;
+save.highscore=Number(save.highscore)||0;
+save.totalKills=Number(save.totalKills)||0;
+
+let state = {
+  lang: save.lang,
+  sound: save.sound,
+  screen: "menu",
+  paused: false,
+  selectedStage: 0
+};
+let isTouch=false;
+try{isTouch=window.matchMedia("(pointer: coarse)").matches}catch(e){isTouch="ontouchstart" in window}
+
+function t(k){return (I18N[state.lang]&&I18N[state.lang][k])||I18N.en[k]||k}
+function saveSave(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(save))}catch(e){}}
+function applyI18n(){
+  document.documentElement.lang=state.lang;
+  $$("[data-i18n]").forEach(el=>{const v=t(el.dataset.i18n);if(v)el.innerHTML=v});
+  updateSettingsUI();
+}
+function updateSettingsUI(){
+  const txt=t("sound")+": "+(state.sound?t("soundOn"):t("soundOff"));
+  $$(".soundToggle").forEach(b=>b.textContent=txt);
+  $$(".langBtn").forEach(b=>b.classList.toggle("active",b.dataset.lang===state.lang));
+  $$(".highVal").forEach(el=>el.textContent=String(save.highscore||0));
+  $$(".stageBtn").forEach(b=>{
+    const stage=Number(b.dataset.stage);
+    b.classList.toggle("current",stage===state.selectedStage);
+    b.disabled=stage>save.unlockedStage;
+  });
+}
+
+/* ---------- STAGES ---------- */
+function ringOb(cx,cz,rad,count,r){const out=[];for(let i=0;i<count;i++){const a=i/count*Math.PI*2;out.push({x:cx+Math.cos(a)*rad,z:cz+Math.sin(a)*rad,r,h:3.2,seg:6})}return out}
+function gridOb(spawnR,cell,r){const out=[];for(let x=-spawnR;x<=spawnR;x+=cell){for(let z=-spawnR;z<=spawnR;z+=cell){if(Math.abs(x)<cell&&Math.abs(z)<cell)continue;out.push({x,z,r,h:2.2,seg:6})}}return out}
+const STAGES=[
+{name:"NEON GRID",bg:0x020610,floor:0x041018,ga:0x00ffff,gb:0x08303a,spawn:[0,0],types:["crawler"],ob:[{x:6,z:6,r:1.2,h:3.2,seg:8},{x:-7,z:4,r:1.0,h:3.2,seg:8},{x:5,z:-8,r:1.5,h:3.2,seg:8},{x:-8,z:-6,r:.8,h:3.2,seg:8},{x:0,z:9,r:1.3,h:3.2,seg:8},{x:-11,z:0,r:1.0,h:3.2,seg:8}]},
+{name:"CRYSTAL MAZE",bg:0x06121c,floor:0x071824,ga:0x2ad7ff,gb:0x0b3d4c,spawn:[12,12],types:["crawler","wraith"],ob:[{x:0,z:0,r:.7,h:4,seg:4},{x:0,z:3,r:.7,h:4,seg:4},{x:0,z:6,r:.7,h:4,seg:4},{x:3,z:0,r:.7,h:4,seg:4},{x:6,z:0,r:.7,h:4,seg:4},{x:-3,z:0,r:.7,h:4,seg:4},{x:-6,z:0,r:.7,h:4,seg:4},{x:0,z:-3,r:.7,h:4,seg:4},{x:0,z:-6,r:.7,h:4,seg:4},{x:8,z:8,r:.7,h:4,seg:4},{x:-8,z:-8,r:.7,h:4,seg:4},{x:9,z:-9,r:.7,h:4,seg:4},{x:-9,z:9,r:.7,h:4,seg:4}]},
+{name:"MAGMA CORE",bg:0x160508,floor:0x1a070a,ga:0xff5522,gb:0x552200,spawn:[0,0],types:["crawler","spider","flayer"],ob:[...ringOb(0,0,9,8,1.0),{x:0,z:0,r:2.4,h:3,seg:6}]},
+{name:"VOID SPIRE",bg:0x0a0418,floor:0x120826,ga:0xa54bff,gb:0x3a1860,spawn:[-12,-12],types:["wraith","spider"],ob:[{x:0,z:0,r:1.8,h:5,seg:6},{x:6,z:6,r:.9,h:5,seg:4},{x:-6,z:6,r:.9,h:5,seg:4},{x:6,z:-6,r:.9,h:5,seg:4},{x:-6,z:-6,r:.9,h:5,seg:4},{x:0,z:11,r:.7,h:5,seg:4},{x:0,z:-11,r:.7,h:5,seg:4},{x:11,z:0,r:.7,h:5,seg:4},{x:-11,z:0,r:.7,h:5,seg:4}]},
+{name:"FROST LATTICE",bg:0x031018,floor:0x061824,ga:0x78e8ff,gb:0x10465a,spawn:[0,13],types:["crawler","flayer","wraith"],ob:[...gridOb(10,6,0.7)]},
+{name:"ABYSS DOME",bg:0x02050a,floor:0x030810,ga:0x00d6ff,gb:0x063040,spawn:[0,0],types:["spider","flayer","wraith"],ob:[...ringOb(0,0,12,12,.7),...ringOb(0,0,5,6,.8)]},
+{name:"CIRCUIT LAB",bg:0x030a06,floor:0x05140a,ga:0x00ff9a,gb:0x094a2a,spawn:[12,0],types:["crawler","spider","brute"],ob:[{x:0,z:0,w:8,d:.7},{x:0,z:6,w:8,d:.7},{x:0,z:-6,w:8,d:.7},{x:6,z:0,w:.7,d:10},{x:-6,z:0,w:.7,d:10}]},
+{name:"ENDLESS",bg:0x060208,floor:0x0b0410,ga:0xff00aa,gb:0x441133,spawn:[0,0],types:["crawler","wraith","spider","flayer","brute"],ob:[{x:9,z:9,r:1.2,seg:4},{x:-9,z:9,r:1.2,seg:4},{x:9,z:-9,r:1.2,seg:4},{x:-9,z:-9,r:1.2,seg:4},{x:0,z:0,r:1.0,seg:4},{x:13,z:0,r:.8,seg:4},{x:-13,z:0,r:.8,seg:4},{x:0,z:13,r:.8,seg:4},{x:0,z:-13,r:.8,seg:4}]}
+];
+save.unlockedStage=clamp(Math.floor(Number(save.unlockedStage)||0),0,STAGES.length-1);
+// box obstacles -> convert to many thin cylinders for collision simplicity
+function obList(stage){
+  const out=[];
+  for(const o of stage.ob){
+    if(o.w||o.d){ // box wall: split into cylinders
+      const len=Math.max(o.w||0,o.d||0), thin=.7;
+      const dirX=(o.w||0)>=(o.d||0);
+      const n=Math.ceil(len/1.3);
+      for(let i=0;i<n;i++){
+        const p=(i-(n-1)/2)*1.3;
+        out.push({x:dirX?(o.x+p):(o.x), z:dirX?(o.z):(o.z+p), r:.55, h:o.h||3.4, seg:4});
+      }
+    }else{
+      out.push({x:o.x,z:o.z,r:o.r||1,h:o.h||3.2,seg:o.seg||8});
+    }
+  }
+  return out;
+}
+function outerWalls(){
+  const out=[]; const H=ARENA_HALF;
+  const makeWall=(x,z,w,d)=>{const len=Math.max(w,d);const n=Math.ceil(len/1.4);const dirX=w>=d;for(let i=0;i<n;i++){const p=(i-(n-1)/1.4/2)*1.4;out.push({x:dirX?x+p:x,z:dirX?z:z+p,r:.8,h:4.4,seg:4})}};
+  const W=H*2+1;
+  makeWall(0,-H,W,1);makeWall(0,H,W,1);makeWall(-H,0,1,W);makeWall(H,0,1,W);
+  return out;
+}
+
+/* ---------- ENEMY DEFS ---------- */
+const MONSTERS={
+crawler:{hp:1,baseSpeed:1.45,score:50,dmg:9,color:0x39ff5a,eye:0xffffff,r:0.55,fly:false,ghost:false,anim:"hop"},
+wraith:{hp:1,baseSpeed:2.25,score:75,dmg:7,color:0x4fc3ff,eye:0xffffff,r:0.55,fly:true,ghost:true,anim:"float"},
+spider:{hp:2,baseSpeed:2.55,score:95,dmg:12,color:0xc04bff,eye:0xffe600,r:0.5,fly:false,ghost:false,anim:"crawl"},
+flayer:{hp:1,baseSpeed:3.15,score:120,dmg:14,color:0xff3a2d,eye:0xfff000,r:0.45,fly:true,ghost:false,anim:"fly"},
+brute:{hp:6,baseSpeed:0.95,score:200,dmg:25,color:0xff9a2d,eye:0xffffff,r:0.95,fly:false,ghost:false,anim:"stomp"}
+};
+
+function buildMonsterMesh(type,enemy){
+  const def=MONSTERS[type];
+  const g=new THREE.Group();
+  const bodyMat=new THREE.MeshBasicMaterial({color:def.color});
+  const edgeMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.5});
+  const eyeMat=new THREE.MeshBasicMaterial({color:def.eye});
+  const parts=[];
+
+  function addMesh(mesh){mesh.userData.enemy=enemy;g.add(mesh);parts.push(mesh);return mesh}
+
+  function edgeFor(geo){const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),edgeMat);e.userData.enemy=enemy;g.add(e);return e}
+
+  let scale=1;
+  if(type==="crawler"){
+    const geo=new THREE.SphereGeometry(0.75,16,12,0,Math.PI*2,0,Math.PI/2);
+    const body=addMesh(new THREE.Mesh(geo,bodyMat));body.position.y=-0.1;
+    edgeFor(geo).position.copy(body.position);
+    const legs=[];for(let i=0;i<3;i++){const a=(i/3)*Math.PI*2;const leg=new THREE.Mesh(new THREE.CylinderGeometry(.06,.14,.6,5),bodyMat);leg.position.set(Math.cos(a)*.5,.1,Math.sin(a)*.5);leg.rotation.z=Math.cos(a)*.3;leg.rotation.x=Math.sin(a)*.3;addMesh(leg);legs.push(leg)}
+    enemy.animRefs={body,legs};
+  }else if(type==="wraith"){
+    const geo=new THREE.ConeGeometry(.6,1.5,10);
+    bodyMat.transparent=true;bodyMat.opacity=.62;
+    const body=addMesh(new THREE.Mesh(geo,bodyMat));body.rotation.x=Math.PI;body.position.y=1;
+    edgeFor(geo).position.copy(body.position);
+    enemy.animRefs={body};
+  }else if(type==="spider"){
+    const geo=new THREE.SphereGeometry(.55,12,10);
+    const body=addMesh(new THREE.Mesh(geo,bodyMat));body.position.y=.7;
+    edgeFor(geo).position.copy(body.position);
+    const legs=[];for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const leg=new THREE.Mesh(new THREE.CylinderGeometry(.05,.03,.8,4),bodyMat);leg.position.set(Math.cos(a)*.7,.3,Math.sin(a)*.7);leg.rotation.z=Math.cos(a)*.9;leg.rotation.x=Math.sin(a)*.9;addMesh(leg);legs.push(leg)}
+    enemy.animRefs={body,legs};
+  }else if(type==="flayer"){
+    const geo=new THREE.SphereGeometry(.45,10,10);
+    const body=addMesh(new THREE.Mesh(geo,bodyMat));body.position.y=1.2;
+    edgeFor(geo).position.copy(body.position);
+    const wings=[];for(let s=-1;s<=1;s+=2){const wg=new THREE.ConeGeometry(.35,1.1,4);const wing=new THREE.Mesh(wg,bodyMat);wing.position.set(s*.6,1.2,0);wing.rotation.z=s*1.3;addMesh(wing);wings.push(wing)}
+    enemy.animRefs={body,wings};
+  }else{ // brute
+    const geo=new THREE.BoxGeometry(1.2,1.8,1.2);
+    const body=addMesh(new THREE.Mesh(geo,bodyMat));body.position.y=.9;
+    edgeFor(geo).position.copy(body.position);
+    const arms=[];for(let s=-1;s<=1;s+=2){const arm=new THREE.Mesh(new THREE.BoxGeometry(.35,1.4,.35),bodyMat);arm.position.set(s*.75,.8,0);addMesh(arm);arms.push(arm)}
+    enemy.animRefs={body,arms};scale=1;
+  }
+  // eyes
+  for(let s=-1;s<=1;s+=2){
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(.08,8,6),eyeMat);
+    const ey = type==="brute"?1.15: type==="crawler"?0.35:1.0;
+    eye.position.set(s*.18,ey,.45);
+    addMesh(eye);
+  }
+  return {group:g,scale};
+}
+
+/* ---------- CORE ---------- */
+let scene=null,camera=null,renderer=null,raycaster=null,center=null;
+let arenaGroup=null;
+const obstacleMeshes=[];
+const colliders=[];
+const enemies=[];
+const enemyGroups=[];
+const effects=[];
+let score=0,health=100,wave=1,timeSurvived=0,spawnTimer=1;
+let playerPos=null,yaw=0,pitch=0;
+const keys={};
+let wantShoot=false,shootCooldown=0;
+const touchMove={x:0,y:0};
+let audioCtx=null,lastTime=0,running=false;
+let currentStageIndex=0,runStartStageIndex=0,stageShownAt=-99;
+
+function ensureAudio(){
+  if(!state.sound)return;
+  if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioCtx=new AC()}
+  if(audioCtx.state==="suspended")audioCtx.resume();
+}
+function tone(f,d=.07,ty="square",v=.045,f2=null){
+  if(!state.sound||!audioCtx)return;
+  const now=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=ty;o.frequency.setValueAtTime(f,now);if(f2)o.frequency.exponentialRampToValueAtTime(f2,now+d);
+  g.gain.setValueAtTime(v,now);g.gain.exponentialRampToValueAtTime(.0001,now+d);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(now+d);
+}
+function playUI(){tone(880,.045,"sine",.03,1200)}
+function playShot(){tone(980,.035,"square",.035,220);tone(160,.05,"sawtooth",.025,60)}
+function playHit(){tone(230,.07,"triangle",.04,80)}
+function playHurt(){tone(110,.10,"sawtooth",.055,40)}
+function playDeath(){tone(220,.45,"sawtooth",.06,40)}
+function playStage(){tone(440,.2,"sine",.04,880);setTimeout(()=>tone(660,.2,"sine",.04,1320),120)}
+
+function init(){
+  applyI18n();
+  if(!window.THREE){show("#loadError");return}
+  scene=new THREE.Scene();scene.fog=new THREE.Fog(0x020610,8,48);
+  camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,.1,120);
+  camera.rotation.order="YXZ";
+  renderer=new THREE.WebGLRenderer({antialias:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+  raycaster=new THREE.Raycaster();raycaster.far=60;center=new THREE.Vector2(0,0);
+  playerPos=new THREE.Vector3(0,1.6,0);
+  buildArena(0);
+  resetGame(true);
+  bindUI();setupTouch();setupDesktopInput();buildStageList();
+  updateHUD();updateUIVisibility();updateSettingsUI();
+  window.addEventListener("resize",onResize);onResize();startLoop();
+}
+
+function clearArena(){
+  if(!arenaGroup)return;
+  for(let i=arenaGroup.children.length-1;i>=0;i--){const c=arenaGroup.children[i];arenaGroup.remove(c);disposeObject(c)}
+  obstacleMeshes.length=0;colliders.length=0;
+  scene.remove(arenaGroup);arenaGroup=null;
+}
+function addObstacleMesh(x,z,r,h,seg,ga){
+  const geo=new THREE.CylinderGeometry(r,r,h,seg);
+  const mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(.55,.1,.12)}));
+  mesh.position.set(x,h/2,z);arenaGroup.add(mesh);
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:ga}));
+  edges.position.copy(mesh.position);arenaGroup.add(edges);
+  obstacleMeshes.push(mesh);colliders.push({type:"circle",x,z,r:r+.18});
+}
+function buildArena(stageIndex){
+  const stage=STAGES[clamp(stageIndex,0,STAGES.length-1)];
+  clearArena();
+  arenaGroup=new THREE.Group();scene.add(arenaGroup);
+  scene.background=new THREE.Color(stage.bg);scene.fog.color.set(stage.bg);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF*2,ARENA_HALF*2),new THREE.MeshBasicMaterial({color:stage.floor,side:THREE.DoubleSide}));
+  floor.rotation.x=-Math.PI/2;arenaGroup.add(floor);
+  const grid=new THREE.GridHelper(ARENA_HALF*2,34,stage.ga,stage.gb);grid.position.y=.02;arenaGroup.add(grid);
+  for(const w of outerWalls())addObstacleMesh(w.x,w.z,w.r,w.h,w.seg,stage.ga);
+  for(const o of obList(stage))addObstacleMesh(o.x,o.z,o.r,o.h,o.seg,stage.ga);
+  currentStageIndex=stageIndex;
+  showStageBanner(stage.name,stageIndex);
+}
+
+function showStageBanner(name,idx){
+  const el=$("#stageBanner");el.textContent=`STAGE ${idx+1}/${STAGES.length}  ${name}`;
+  el.classList.remove("hidden");el.classList.add("show");
+  clearTimeout(showStageBanner._t);
+  showStageBanner._t=setTimeout(()=>el.classList.remove("show"),1800);
+  showStageBanner._h=setTimeout(()=>el.classList.add("hidden"),2400);
+  stageShownAt=timeSurvived;
+}
+
+function clearDynamic(){while(enemies.length)removeEnemy(enemies[0]);clearEffects()}
+function clearEffects(){while(effects.length){const ef=effects.pop();scene.remove(ef.obj);disposeObject(ef.obj)}}
+function removeEnemy(e){const i=enemies.indexOf(e);if(i>=0)enemies.splice(i,1);const j=enemyGroups.indexOf(e.group);if(j>=0)enemyGroups.splice(j,1);if(e.group){arenaGroup.remove(e.group);disposeObject(e.group)}}
+function disposeObject(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){Array.isArray(n.material)?n.material.forEach(m=>m.dispose()):n.material.dispose()}})}
+
+function stageForIndex(i){return STAGES[clamp(i,0,STAGES.length-1)]}
+function pickEnemyType(stage){
+  const pool=stage.types;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function spawnEnemy(){
+  if(enemies.length>=MAX_ALIVE)return;
+  const stage=stageForIndex(currentStageIndex);
+  const type=pickEnemyType(stage);
+  const def=MONSTERS[type];
+  const p=findSpawn();
+  const enemy={mesh:null,group:null,animRefs:null,type,def,health:def.hp+Math.floor(wave/5),speed:def.baseSpeed+Math.min(1.5,wave*.06),attackCd:.3,dead:false,pos:new THREE.Vector3(p.x,0,p.z),bob:Math.random()*10};
+  const made=buildMonsterMesh(type,enemy);
+  enemy.group=made.group;enemy.mesh=made.group;
+  enemy.group.position.copy(enemy.pos);
+  arenaGroup.add(enemy.group);
+  enemies.push(enemy);enemyGroups.push(enemy.group);
+}
+function findSpawn(){
+  const safe=playerPos||new THREE.Vector3();
+  for(let i=0;i<120;i++){
+    const a=Math.random()*Math.PI*2,rad=ARENA_HALF-1.4-Math.random()*6;
+    const x=Math.cos(a)*rad,z=Math.sin(a)*rad;
+    if(Math.hypot(x-safe.x,z-safe.z)<9)continue;
+    let ok=true;for(const c of colliders){if(Math.hypot(x-c.x,z-c.z)<c.r+.8){ok=false;break}}
+    if(ok)return{x,z};
+  }
+  const s=STAGES[currentStageIndex].spawn;return{x:s[0],z:s[1]};
+}
+function resolveCircle(pos,r,ghost){
+  const B=ARENA_HALF-.7;
+  if(!ghost){pos.x=clamp(pos.x,-B,B);pos.z=clamp(pos.z,-B,B)}
+  else{pos.x=clamp(pos.x,-B-2,B+2);pos.z=clamp(pos.z,-B-2,B+2)}
+  if(ghost)return;
+  for(const c of colliders){
+    const dx=pos.x-c.x,dz=pos.z-c.z,d=Math.hypot(dx,dz);
+    if(d<c.r+r){if(d<1e-4){pos.x+=c.r+r;continue}const push=c.r+r-d;pos.x+=dx/d*push;pos.z+=dz/d*push}
+  }
+}
+function updatePlayer(dt){
+  const fwd=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)+touchMove.y;
+  const strafe=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+touchMove.x;
+  const len=Math.hypot(fwd,strafe);
+  const nf=len>1?fwd/len:fwd,ns=len>1?strafe/len:strafe;
+  const speed=6.5;
+  const dir=new THREE.Vector3();camera.getWorldDirection(dir);dir.y=0;dir.normalize();
+  const right=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
+  playerPos.x+=(dir.x*nf+right.x*ns)*speed*dt;
+  playerPos.z+=(dir.z*nf+right.z*ns)*speed*dt;
+  resolveCircle(playerPos,.34,false);
+  camera.position.copy(playerPos);
+}
+function animMonster(e,t){
+  const a=e.animRefs,r=e.def.anim;
+  if(r==="hop"){const b=Math.abs(Math.sin(t*4+e.bob));e.group.position.y=b*.35;if(a.legs)a.legs.forEach((l,i)=>l.rotation.x=Math.sin(t*6+i)*.2)}
+  else if(r==="float"){e.group.position.y=.9+Math.sin(t*2+e.bob)*.3;if(a.body)a.body.rotation.y=t*.5}
+  else if(r==="crawl"){if(a.legs)a.legs.forEach((l,i)=>l.rotation.z=Math.cos(a.lx=0,l.rotation.z)+Math.sin(t*8+i*1.2)*.18);if(a.body)a.body.position.y=.7+Math.sin(t*7)*.04}
+  else if(r==="fly"){if(a.wings)a.wings.forEach((w,i)=>w.rotation.z=(i?1.3:-1.3)+Math.sin(t*12)*.6);e.group.position.y=1.2+Math.sin(t*3+e.bob)*.4}
+  else if(r==="stomp"){if(a.arms)a.arms.forEach((arm,i)=>arm.rotation.x=Math.sin(t*3+i*Math.PI)*.15);if(a.body)a.body.position.y=.9+Math.abs(Math.sin(t*3))*.12}
+}
+function updateEnemies(dt){
+  if(state.screen!=="playing")return;
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];if(e.dead){removeEnemy(e);continue}
+    animMonster(e,timeSurvived);
+    e.attackCd-=dt;
+    const to=new THREE.Vector3(playerPos.x-e.pos.x,0,playerPos.z-e.pos.z);
+    const dist=to.length();
+    if(dist>1.6){
+      if(dist>.01){to.multiplyScalar(1/dist);e.pos.addScaledVector(to,e.speed*dt);resolveCircle(e.pos,e.def.r,e.def.ghost);e.pos.y=e.def.fly?1.2:0;e.group.position.copy(e.pos);animMonster(e,timeSurvived);e.group.lookAt(playerPos.x,e.group.position.y,playerPos.z)}
+    }else if(e.attackCd<=0){
+      damagePlayer(e.def.dmg+Math.floor(wave));e.attackCd=.85;
+      if(dist>.01){const away=to.clone().multiplyScalar(-1);e.pos.addScaledVector(away,.7);resolveCircle(e.pos,e.def.r,e.def.ghost);e.group.position.copy(e.pos)}
+    }
+  }
+}
+function updateSpawns(dt){
+  wave=1+Math.floor(timeSurvived/18);
+  const newStage=clamp(runStartStageIndex+Math.floor(timeSurvived/STAGE_DURATION),0,STAGES.length-1);
+  if(newStage!==currentStageIndex){
+    clearDynamic();
+    buildArena(newStage);
+    save.unlockedStage=Math.max(save.unlockedStage,newStage);
+    saveSave();updateSettingsUI();
+    const s=STAGES[newStage].spawn;
+    playerPos.set(s[0],1.6,s[1]);camera.position.copy(playerPos);
+    playStage();updateHUD();return;
+  }
+  const maxAlive=Math.min(MAX_ALIVE,5+wave*2+currentStageIndex*2);
+  if(enemies.length<maxAlive){spawnTimer-=dt;if(spawnTimer<=0){spawnTimer=Math.max(.28,1.55-wave*.09-currentStageIndex*.06);spawnEnemy();if(timeSurvived>70)spawnEnemy()}}else{spawnTimer=.45}
+}
+function shoot(){
+  if(state.screen!=="playing"||state.paused||shootCooldown>0)return;
+  playShot();shootCooldown=.16;
+  camera.updateMatrixWorld(true);raycaster.setFromCamera(center,camera);
+  const targets=obstacleMeshes.concat(enemyGroups);
+  const hits=raycaster.intersectObjects(targets,true);
+  const dir=new THREE.Vector3();camera.getWorldDirection(dir);
+  let end=camera.position.clone().addScaledVector(dir,60);let enemy=null;
+  if(hits.length>0){end=hits[0].point.clone();if(hits[0].object.userData.enemy)enemy=hits[0].object.userData.enemy}
+  addTracer(camera.position.clone(),end);
+  if(enemy)damageEnemy(enemy,1);
+}
+function addTracer(a,b){const geo=new THREE.BufferGeometry().setFromPoints([a,b]);const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x00ffff}));scene.add(line);effects.push({obj:line,life:.06})}
+function addExplosion(pos,color){const geo=new THREE.SphereGeometry(.2,8,6);const mat=new THREE.MeshBasicMaterial({color:color||0xff0066,transparent:true,opacity:.9});const m=new THREE.Mesh(geo,mat);m.position.copy(pos);scene.add(m);effects.push({obj:m,type:"exp",life:.28,max:.28})}
+function updateEffects(dt){for(let i=effects.length-1;i>=0;i--){const ef=effects[i];ef.life-=dt;if(ef.life<=0){scene.remove(ef.obj);disposeObject(ef.obj);effects.splice(i,1)}else if(ef.type==="exp"){const p=1-ef.life/ef.max;ef.obj.scale.setScalar(.3+p*2.6);ef.obj.material.opacity=.9*(1-p)}}}
+function damageEnemy(e,dmg){
+  if(e.dead)return;e.health-=dmg;
+  if(e.health<=0){e.dead=true;addExplosion(e.pos.clone(),e.def.color);score+=e.def.score+wave*8;save.totalKills=(save.totalKills||0)+1;playHit();removeEnemy(e)}
+  else{if(e.animRefs.body)e.animRefs.body.material.color.set(0xffffff);setTimeout(()=>{if(e.animRefs&&e.animRefs.body)e.animRefs.body.material.color.set(e.def.color)},70)}
+}
+function damagePlayer(a){if(state.screen!=="playing")return;health=Math.max(0,health-a);updateHUD();playHurt();if(health<=0)gameOver()}
+function gameOver(){
+  if(state.screen==="over")return;state.paused=false;state.screen="over";wantShoot=false;
+  try{if(document.exitPointerLock)document.exitPointerLock()}catch(e){}
+  save.highscore=Math.max(save.highscore||0,score);saveSave();updateSettingsUI();
+  $("#finalScore").textContent=t("scoreLabel")+": "+score;
+  $("#finalStage").textContent=String(currentStageIndex+1);
+  $("#finalWave").textContent=String(wave);
+  show("#overScreen");updateUIVisibility();playDeath();
+}
+function resetGame(resetStage) {
+  clearDynamic();
+  score = 0;
+  health = 100;
+  wave = 1;
+  timeSurvived = 0;
+  spawnTimer = 0.8;
+  yaw = 0;
+  pitch = 0;
+  wantShoot = false;
+  shootCooldown = 0;
+
+  const stageIndex = clamp(
+    Number(state.selectedStage ?? currentStageIndex ?? 0),
+    0,
+    STAGES.length - 1
+  );
+
+  const s = STAGES[stageIndex].spawn;
+
+  playerPos.set(s[0], 1.6, s[1]);
+  camera.position.copy(playerPos);
+  camera.rotation.set(pitch, yaw, 0);
+}
+function startGame() {
+  ensureAudio();
+  state.selectedStage = clamp(Number(state.selectedStage || 0), 0, save.unlockedStage);
+  runStartStageIndex=state.selectedStage;
+  hide("#startScreen");hide("#pauseScreen");hide("#overScreen");
+  state.screen="playing";state.paused=false;
+  buildArena(state.selectedStage);
+  resetGame(true);updateHUD();updateUIVisibility();
+  if(!isTouch&&renderer.domElement.requestPointerLock)try{renderer.domElement.requestPointerLock()}catch(e){}
+}
+function pauseGame(){if(state.screen!=="playing"||state.paused)return;state.paused=true;wantShoot=false;try{if(document.exitPointerLock)document.exitPointerLock()}catch(e){}show("#pauseScreen");updateUIVisibility()}
+function resumeGame(){if(state.screen!=="playing"||!state.paused)return;state.paused=false;hide("#pauseScreen");updateUIVisibility();if(!isTouch&&renderer.domElement.requestPointerLock)try{renderer.domElement.requestPointerLock()}catch(e){}}
+function quitToMenu(){state.paused=false;state.screen="menu";wantShoot=false;hide("#pauseScreen");hide("#overScreen");show("#startScreen");updateUIVisibility();updateSettingsUI()}
+function updateUIVisibility(){const p=state.screen==="playing"&&!state.paused;setClass("#hud","hidden",!p);setClass("#crosshair","hidden",!p);setClass("#topRight","hidden",!p);const tc=$("#touchControls");if(tc)tc.style.display=(p&&isTouch)?"block":"none"}
+function updateHUD(){
+  if(state.screen!=="playing"&&!state.paused)return;
+  $("#scoreVal").textContent=String(score);
+  $("#waveVal").textContent=String(wave);
+  $("#stageVal").textContent=(currentStageIndex+1)+"/"+STAGES.length;
+  $("#timeVal").textContent=formatTime(timeSurvived);
+  $("#hpText").textContent=String(Math.max(0,Math.floor(health)));
+  $("#hpFill").style.width=Math.max(0,Math.min(100,health))+"%";
+}
+function formatTime(s){const m=Math.floor(s/60),ss=Math.floor(s%60);return m+":"+String(ss).padStart(2,"0")}
+function startLoop(){if(running)return;running=true;lastTime=performance.now();requestAnimationFrame(loop)}
+function loop(now){
+  const dt=Math.min(.05,(now-lastTime)/1000);lastTime=now;
+  if(state.screen==="playing"&&!state.paused){
+    camera.rotation.set(pitch,yaw,0);camera.updateMatrixWorld(true);
+    updatePlayer(dt);
+    if(state.screen==="playing"){updateSpawns(dt);if(state.screen==="playing"&&!state.paused){updateEnemies(dt);shootCooldown=Math.max(0,shootCooldown-dt);if(wantShoot)shoot();updateEffects(dt);timeSurvived+=dt;updateHUD()}}
+  }else if(camera){camera.rotation.set(pitch,yaw,0)}
+  if(renderer&&scene&&camera)renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+function onResize(){if(!renderer||!camera)return;const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}
+function buildStageList(){
+  const el=$("#stageList");if(!el)return;el.innerHTML="";
+  STAGES.forEach((s,i)=>{const b=document.createElement("button");b.className="stageBtn";b.dataset.stage=String(i);b.textContent=(i+1)+". "+s.name;b.addEventListener("click",()=>{if(i>save.unlockedStage)return;state.selectedStage=i;updateSettingsUI();playUI()});el.appendChild(b)});
+  state.selectedStage=state.selectedStage||0;updateSettingsUI();
+}
+function bindUI(){
+  $("#startBtn").addEventListener("click",startGame);
+  $("#retryBtn").addEventListener("click",()=>{startGame()});
+  $("#resumeBtn").addEventListener("click",resumeGame);
+  $("#quitBtn").addEventListener("click",quitToMenu);
+  $("#backBtn").addEventListener("click",quitToMenu);
+  $("#pauseBtn").addEventListener("click",pauseGame);
+  $$(".langBtn").forEach(b=>b.addEventListener("click",()=>{const l=b.dataset.lang;if(!I18N[l])return;state.lang=l;save.lang=l;saveSave();applyI18n();playUI()}));
+  $$(".soundToggle").forEach(b=>b.addEventListener("click",()=>{state.sound=!state.sound;save.sound=state.sound;saveSave();updateSettingsUI();if(state.sound){ensureAudio();playUI()}}));
+  document.addEventListener("contextmenu",e=>e.preventDefault());
+}
+function setupTouch(){
+  const left=$("#touchLeft"),knob=$("#stickKnob"),right=$("#touchRight"),fire=$("#fireBtn");
+  let lid=null,lcenter=null;
+  function clrL(){lid=null;touchMove.x=0;touchMove.y=0;if(knob)knob.style.transform="translate(0px,0px)"}
+  function hL(e){if(e.pointerId!==lid)return;const dx=e.clientX-lcenter.x,dy=e.clientY-lcenter.y,max=55,m=Math.hypot(dx,dy),cl=Math.min(1,m/max);const nx=(m?dx/m:0)*cl,ny=(m?dy/m:0)*cl;touchMove.x=nx;touchMove.y=-ny;if(knob)knob.style.transform=`translate(${nx*40}px,${-ny*40}px)`}
+  left.addEventListener("pointerdown",e=>{e.preventDefault();lid=e.pointerId;const r=left.getBoundingClientRect();lcenter={x:r.left+r.width/2,y:r.top+r.height/2};try{left.setPointerCapture(e.pointerId)}catch(x){}hL(e)});
+  left.addEventListener("pointermove",hL);left.addEventListener("pointerup",clrL);left.addEventListener("pointercancel",clrL);
+  let lookId=null,lastL=null;
+  function clrLk(){lookId=null;lastL=null}
+  right.addEventListener("pointerdown",e=>{if(state.screen!=="playing"||state.paused)return;e.preventDefault();lookId=e.pointerId;lastL={x:e.clientX,y:e.clientY};try{right.setPointerCapture(e.pointerId)}catch(x){}});
+  right.addEventListener("pointermove",e=>{if(e.pointerId!==lookId||!lastL)return;e.preventDefault();const dx=e.clientX-lastL.x,dy=e.clientY-lastL.y;lastL={x:e.clientX,y:e.clientY};const s=.0042;yaw-=dx*s;pitch=clamp(pitch-dy*s,-1.25,1.25)});
+  right.addEventListener("pointerup",clrLk);right.addEventListener("pointercancel",clrLk);
+  fire.addEventListener("pointerdown",e=>{e.preventDefault();wantShoot=true});
+  ["pointerup","pointercancel","pointerleave"].forEach(ev=>fire.addEventListener(ev,e=>{e.preventDefault();wantShoot=false}));
+}
+function setupDesktopInput(){
+  const canvas=renderer.domElement;
+  window.addEventListener("keydown",e=>{keys[e.code]=true;if(e.code==="Space"){e.preventDefault();wantShoot=true}if(e.code.startsWith("Arrow"))e.preventDefault();if(state.screen==="menu"&&e.code==="Enter")startGame();if((e.code==="KeyP"||e.code==="Escape")&&state.screen==="playing"){state.paused?resumeGame():pauseGame()}});
+  window.addEventListener("keyup",e=>{keys[e.code]=false;if(e.code==="Space")wantShoot=false});
+  let drag=false,lastM=null;
+  canvas.addEventListener("mousedown",e=>{if(state.screen!=="playing"||state.paused||isTouch)return;wantShoot=true;drag=true;lastM={x:e.clientX,y:e.clientY};if(document.pointerLockElement!==canvas)try{canvas.requestPointerLock()}catch(x){}});
+  window.addEventListener("mouseup",()=>{wantShoot=false;drag=false;lastM=null});
+  document.addEventListener("mousemove",e=>{if(state.screen!=="playing"||state.paused||isTouch)return;if(document.pointerLockElement===canvas){const s=.0022;yaw-=e.movementX*s;pitch=clamp(pitch-e.movementY*s,-1.25,1.25)}else if(drag&&lastM){const dx=e.clientX-lastM.x,dy=e.clientY-lastM.y;lastM={x:e.clientX,y:e.clientY};const s=.0035;yaw-=dx*s;pitch=clamp(pitch-dy*s,-1.25,1.25)}});
+  document.addEventListener("pointerlockchange",()=>{if(document.pointerLockElement!==canvas&&state.screen==="playing"&&!state.paused&&!isTouch)pauseGame()});
+}
+
+applyI18n();
+if(window.THREE){init()}else{show("#loadError")}
+</script>
+</body>
+</html>
